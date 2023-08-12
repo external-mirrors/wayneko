@@ -75,7 +75,8 @@ struct Surface
 
 struct Surface surface = { 0 };
 
-const uint32_t surface_width = 100;
+// TODO wide surface and let the neko run around.
+const uint32_t surface_width = neko_size;
 const uint32_t surface_height = neko_size;
 
 int ret = EXIT_SUCCESS;
@@ -548,7 +549,7 @@ static bool animation_next_state (void)
 	switch (current_neko)
 	{
 		case NEKO_STARE:
-			switch (rand() % 20)
+			switch (rand() % 25)
 			{
 				case 0:
 					current_neko = NEKO_SCRATCH_1;
@@ -560,18 +561,13 @@ static bool animation_next_state (void)
 					return true;
 
 				case 2:
-					current_neko = NEKO_SHOCK;
-					animation_ticks_until_next_frame = 5;
-					return true;
-
-				case 3:
 					current_neko = NEKO_YAWN;
 					animation_ticks_until_next_frame = 5;
 					return true;
 
-				case 4:
+				case 3:
 					current_neko = NEKO_THINK;
-					animation_ticks_until_next_frame = 10;
+					animation_ticks_until_next_frame = 15;
 					return true;
 
 				default:
@@ -583,37 +579,71 @@ static bool animation_next_state (void)
 		case NEKO_SLEEP_2:
 		case NEKO_SCRATCH_1:
 		case NEKO_SCRATCH_2:
-			switch (rand() % 4)
+			if ( rand() % 4 == 0)
 			{
-				case 0:
-					current_neko = NEKO_STARE;
-					animation_ticks_until_next_frame = 5;
-					return true;
-
-				default:
-					switch (current_neko)
+				if ( current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2 )
+				{
+					if ( rand() % 2 == 0 )
 					{
-						case NEKO_SLEEP_1: current_neko = NEKO_SLEEP_2; break;
-						case NEKO_SLEEP_2: current_neko = NEKO_SLEEP_1; break;
-						case NEKO_SCRATCH_1: current_neko = NEKO_SCRATCH_2; break;
-						case NEKO_SCRATCH_2: current_neko = NEKO_SCRATCH_1; break;
-						default: /* unreachable. */ break;
+						current_neko = NEKO_SHOCK;
+						animation_ticks_until_next_frame = 3;
+						return true;
 					}
-					if ( current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2 )
-						animation_ticks_until_next_frame = 10;
-					return true;
+				}
+
+				current_neko = NEKO_STARE;
+				animation_ticks_until_next_frame = 5;
+				return true;
 			}
-			break;
+			else
+			{
+				switch (current_neko)
+				{
+					case NEKO_SLEEP_1: current_neko = NEKO_SLEEP_2; break;
+					case NEKO_SLEEP_2: current_neko = NEKO_SLEEP_1; break;
+					case NEKO_SCRATCH_1: current_neko = NEKO_SCRATCH_2; break;
+					case NEKO_SCRATCH_2: current_neko = NEKO_SCRATCH_1; break;
+					default: /* unreachable. */ break;
+				}
+				if ( current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2 )
+					animation_ticks_until_next_frame = 10;
+				return true;
+			}
+
+		case NEKO_THINK:
+			if ( rand() %2 == 0 )
+			{
+				current_neko = NEKO_STARE;
+				animation_ticks_until_next_frame = 10;
+				return true;
+			}
+			else
+			{
+				current_neko = NEKO_SHOCK;
+				animation_ticks_until_next_frame = 3;
+				return true;
+			}
+
+		case NEKO_YAWN:
+			if ( rand() %2 == 0 )
+			{
+				current_neko = NEKO_STARE;
+				animation_ticks_until_next_frame = 10;
+				return true;
+			}
+			else
+			{
+				current_neko = NEKO_SLEEP_1;
+				animation_ticks_until_next_frame = 10;
+				return true;
+			}
 
 		case NEKO_SHOCK:
-		case NEKO_YAWN:
-		case NEKO_THINK:
 		default:
 			current_neko = NEKO_STARE;
 			animation_ticks_until_next_frame = 5;
 			return true;
 	}
-	return false;
 }
 
 /*************
@@ -835,7 +865,6 @@ int main (void)
 			{
 				if (animation_next_state())
 				 	surface_next_frame();
-				fprintf(stderr, "tick!\n");
 				clock_gettime(CLOCK_MONOTONIC, &last_tick);
 			}
 			else
