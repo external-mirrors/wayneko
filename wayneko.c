@@ -413,13 +413,15 @@ static struct Buffer *buffer_pool_new_buffer (uint32_t width, uint32_t height)
 	return buffer;
 }
 
-static void buffer_pool_cull_buffers (void)
+static void buffer_pool_cull_buffers (struct Buffer *skip)
 {
 	int to_remove = wl_list_length(&buffer_pool) - (max_buffer_multiplicity * surface_amount);
 	struct Buffer *buffer, *tmp;
 	wl_list_for_each_safe(buffer, tmp, &buffer_pool, link)
 	{
-		if (to_remove == 0)
+		if ( buffer == skip )
+			continue;
+		if ( to_remove == 0 )
 			break;
 		if (buffer->busy)
 			continue;
@@ -440,7 +442,7 @@ static struct Buffer *buffer_pool_next_buffer (uint32_t width, uint32_t height)
 		ret = buffer_pool_new_buffer(width, height);
 
 	if ( wl_list_length(&buffer_pool) > max_buffer_multiplicity * surface_amount )
-		buffer_pool_cull_buffers();
+		buffer_pool_cull_buffers(ret);
 
 	return ret;
 }
@@ -454,6 +456,7 @@ static void buffer_pool_destroy_all_buffers (void)
 		buffer_destroy(buffer);
 	}
 }
+
 /***********
  *         *
  *  Atlas  *
@@ -557,7 +560,7 @@ static void animation_neko_do_run_left (void)
 
 static bool animation_can_run_right (void)
 {
-	return surface.neko_x < surface.width - neko_size;
+	return surface.neko_x < surface.width - neko_size - neko_x_advance;
 }
 
 static void animation_neko_do_run_right (void)
@@ -743,8 +746,13 @@ static void surface_next_frame (void)
 	if ( buffer == NULL )
 		return;
 
-	pixman_image_fill_rectangles(PIXMAN_OP_CLEAR, buffer->pixman_image, &bg_colour,
-			1, &(pixman_rectangle16_t){ (int16_t)surface.prev_neko_x, (int16_t)0, (uint16_t)neko_size, (uint16_t)neko_size, });
+	pixman_image_fill_rectangles(
+		PIXMAN_OP_CLEAR, buffer->pixman_image, &bg_colour,
+		1, &(pixman_rectangle16_t){
+			(int16_t)surface.prev_neko_x, (int16_t)0,
+			(uint16_t)neko_size, (uint16_t)neko_size,
+		}
+	);
 	atlas_composite_neko(buffer, current_neko, surface.neko_x, 0);
 
 	wl_surface_set_buffer_scale(surface.wl_surface, 1);
