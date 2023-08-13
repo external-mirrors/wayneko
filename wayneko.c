@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <getopt.h>
 #include <pixman.h>
 #include <poll.h>
 #include <signal.h>
@@ -25,6 +24,13 @@
 #define MIN(A, B) (A < B ? A : B)
 
 #include "wlr-layer-shell-unstable-v1.h"
+
+const char usage[] =
+	"Usage: wayneko [options...]\n"
+	"  -h, --help\n"
+	"  --background-colour 0xRRGGBB[AA]\n"
+	"  --outline-colour    0xRRGGBB[AA]\n"
+	"\n";
 
 pixman_color_t bg_colour;
 pixman_color_t border_colour;
@@ -909,17 +915,53 @@ static bool colour_from_hex (pixman_color_t *colour, const char *hex)
 	return true;
 }
 
-int main (void)
+static bool colour_from_flag(pixman_color_t *colour, int argc, char *argv[], int *i)
+{
+	if ( argc == (*i) + 1 )
+	{
+		fprintf(stderr, "ERROR: Flag '%s' requires a parameter.\n", argv[(*i)]);
+		return false;
+	}
+	if (!colour_from_hex(colour, argv[(*i)+1]))
+		return false;
+	(*i)++;
+	return true;
+}
+
+int main (int argc, char *argv[])
 {
 	init_signals();
-
-	wl_list_init(&buffer_pool);
-	srand((unsigned int)time(0));
 
 	colour_from_hex(&bg_colour, "0xFFFFFF");
 	colour_from_hex(&border_colour, "0x000000");
 
 	// TODO command line args
+	for (int i = 1; i < argc; i++)
+	{
+		if ( strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-?") == 0 )
+		{
+			fputs(usage, stderr);
+			return EXIT_SUCCESS;
+		}
+		else if ( strcmp(argv[i], "--background-colour") == 0 )
+		{
+			if (!colour_from_flag(&bg_colour, argc, argv, &i))
+				return EXIT_FAILURE;
+		}
+		else if ( strcmp(argv[i], "--outline-colour") == 0 )
+		{
+			if (!colour_from_flag(&border_colour, argc, argv, &i))
+				return EXIT_FAILURE;
+		}
+		else
+		{
+			fprintf(stderr, "ERROR: Unknown option: %s\n", argv[i]);
+			return EXIT_FAILURE;
+		}
+	}
+
+	wl_list_init(&buffer_pool);
+	srand((unsigned int)time(0));
 
 	if (!atlas_init())
 		return EXIT_FAILURE;
