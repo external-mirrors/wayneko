@@ -549,9 +549,69 @@ static bool animation_can_run_left (void)
 	return surface.neko_x > neko_x_advance;
 }
 
+static void animation_neko_do_run_left (void)
+{
+	current_neko = current_neko == NEKO_RUN_LEFT_1 ? NEKO_RUN_LEFT_2 : NEKO_RUN_LEFT_1;
+	animation_ticks_until_next_frame = 0;
+}
+
 static bool animation_can_run_right (void)
 {
 	return surface.neko_x < surface.width - neko_size;
+}
+
+static void animation_neko_do_run_right (void)
+{
+	current_neko = current_neko == NEKO_RUN_RIGHT_1 ? NEKO_RUN_RIGHT_2 : NEKO_RUN_RIGHT_1;
+	animation_ticks_until_next_frame = 0;
+}
+
+static void animation_neko_advance_left (void)
+{
+	surface.prev_neko_x = surface.neko_x;
+	surface.neko_x -= neko_x_advance;
+}
+
+static void animation_neko_advance_right (void)
+{
+	surface.prev_neko_x = surface.neko_x;
+	surface.neko_x += neko_x_advance;
+}
+
+static void animation_neko_do_stare (bool quick)
+{
+	current_neko = NEKO_STARE;
+	animation_ticks_until_next_frame = quick ? 5 : 10;
+}
+
+static void animation_neko_do_yawn (void)
+{
+	current_neko = NEKO_YAWN;
+	animation_ticks_until_next_frame = 5;
+}
+
+static void animation_neko_do_think (void)
+{
+	current_neko = NEKO_THINK;
+	animation_ticks_until_next_frame = 15;
+}
+
+static void animation_neko_do_shock (void)
+{
+	current_neko = NEKO_SHOCK;
+	animation_ticks_until_next_frame = 3;
+}
+
+static void animation_neko_do_sleep (void)
+{
+	current_neko = current_neko == NEKO_SLEEP_1 ? NEKO_SLEEP_2 : NEKO_SLEEP_1;
+	animation_ticks_until_next_frame = 10;
+}
+
+static void animation_neko_do_scratch (void)
+{
+	current_neko = current_neko == NEKO_SCRATCH_1 ? NEKO_SCRATCH_2 : NEKO_SCRATCH_1;
+	animation_ticks_until_next_frame = 0;
 }
 
 /** Returns true if new frame is needed. */
@@ -569,160 +629,105 @@ static bool animation_next_state (void)
 			switch (rand() % 24)
 			{
 				case 0:
-					current_neko = NEKO_SCRATCH_1;
-					return true;
+					animation_neko_do_scratch();
+					break;
 
 				case 1:
-					current_neko = NEKO_SLEEP_1;
-					animation_ticks_until_next_frame = 10;
-					return true;
+					animation_neko_do_sleep();
+					break;
 
 				case 2:
-					current_neko = NEKO_YAWN;
-					animation_ticks_until_next_frame = 5;
-					return true;
+					animation_neko_do_yawn();
+					break;
 
 				case 3:
-					current_neko = NEKO_THINK;
-					animation_ticks_until_next_frame = 15;
-					return true;
+					animation_neko_do_think();
+					break;
 
 				case 4:
 					if (!animation_can_run_left())
 						return false;
-					current_neko = NEKO_RUN_LEFT_1;
-					surface.prev_neko_x = surface.neko_x;
-					surface.neko_x -= neko_x_advance;
-					return true;
+					animation_neko_advance_left();
+					animation_neko_do_run_left();
+					break;
 
 				case 5:
 					if (!animation_can_run_right())
 						return false;
-					current_neko = NEKO_RUN_RIGHT_1;
-					surface.prev_neko_x = surface.neko_x;
-					surface.neko_x += neko_x_advance;
-					return true;
+					animation_neko_advance_right();
+					animation_neko_do_run_right();
+					break;
 
 				default:
 					return false;
 			}
-			break;
+			return true;
 
 		case NEKO_RUN_RIGHT_1:
 		case NEKO_RUN_RIGHT_2:
+			if ( animation_can_run_right() && rand() % 4 != 0 )
+			{
+				animation_neko_do_run_right();
+				animation_neko_advance_right();
+			}
+			else
+				animation_neko_do_stare(false);
+			return true;
+
 		case NEKO_RUN_LEFT_1:
 		case NEKO_RUN_LEFT_2:
-			if ( current_neko == NEKO_RUN_LEFT_1 || current_neko == NEKO_RUN_LEFT_2 )
+			if ( animation_can_run_left() && rand() % 4 != 0 )
 			{
-				if (!animation_can_run_left())
-				{
-					current_neko = NEKO_STARE;
-					animation_ticks_until_next_frame = 10;
-					return true;
-				}
+				animation_neko_do_run_left();
+				animation_neko_advance_left();
 			}
 			else
-			{
-				if (!animation_can_run_right())
-				{
-					current_neko = NEKO_STARE;
-					animation_ticks_until_next_frame = 10;
-					return true;
-				}
-			}
-
-			if ( rand() % 4 == 0 )
-			{
-				current_neko = NEKO_STARE;
-				animation_ticks_until_next_frame = 10;
-			}
-			else
-			{
-				switch (current_neko)
-				{
-					case NEKO_RUN_RIGHT_1: current_neko = NEKO_RUN_RIGHT_2; break;
-					case NEKO_RUN_RIGHT_2: current_neko = NEKO_RUN_RIGHT_1; break;
-					case NEKO_RUN_LEFT_1: current_neko = NEKO_RUN_LEFT_2; break;
-					case NEKO_RUN_LEFT_2: current_neko = NEKO_RUN_LEFT_1; break;
-					default: /* unreachable. */ break;
-				}
-				surface.prev_neko_x = surface.neko_x;
-				if ( current_neko == NEKO_RUN_LEFT_1 || current_neko == NEKO_RUN_LEFT_2 )
-					surface.neko_x -= neko_x_advance;
-				else
-					surface.neko_x += neko_x_advance;
-			}
+				animation_neko_do_stare(false);
 			return true;
 
 		case NEKO_SLEEP_1:
 		case NEKO_SLEEP_2:
+			if ( rand() % 4 == 0 )
+			{
+				if ( rand() % 2 == 0 )
+					animation_neko_do_shock();
+				else
+					animation_neko_do_stare(false);
+			}
+			else
+				animation_neko_do_sleep();
+			return true;
+
+
 		case NEKO_SCRATCH_1:
 		case NEKO_SCRATCH_2:
 			if ( rand() % 4 == 0 )
-			{
-				if ( current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2 )
-				{
-					if ( rand() % 2 == 0 )
-					{
-						current_neko = NEKO_SHOCK;
-						animation_ticks_until_next_frame = 3;
-						return true;
-					}
-				}
-
-				current_neko = NEKO_STARE;
-				animation_ticks_until_next_frame = 5;
-				return true;
-			}
+				animation_neko_do_stare(false);
 			else
-			{
-				switch (current_neko)
-				{
-					case NEKO_SLEEP_1: current_neko = NEKO_SLEEP_2; break;
-					case NEKO_SLEEP_2: current_neko = NEKO_SLEEP_1; break;
-					case NEKO_SCRATCH_1: current_neko = NEKO_SCRATCH_2; break;
-					case NEKO_SCRATCH_2: current_neko = NEKO_SCRATCH_1; break;
-					default: /* unreachable. */ break;
-				}
-				if ( current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2 )
-					animation_ticks_until_next_frame = 10;
-				return true;
-			}
+				animation_neko_do_scratch();
+			return true;
 
 		case NEKO_THINK:
 			if ( rand() %2 == 0 )
-			{
-				current_neko = NEKO_STARE;
-				animation_ticks_until_next_frame = 10;
-				return true;
-			}
+				animation_neko_do_stare(false);
 			else
-			{
-				current_neko = NEKO_SHOCK;
-				animation_ticks_until_next_frame = 3;
-				return true;
-			}
+				animation_neko_do_shock();
+			return true;
 
 		case NEKO_YAWN:
 			if ( rand() %2 == 0 )
-			{
-				current_neko = NEKO_STARE;
-				animation_ticks_until_next_frame = 10;
-				return true;
-			}
+				animation_neko_do_stare(false);
 			else
-			{
-				current_neko = NEKO_SLEEP_1;
-				animation_ticks_until_next_frame = 10;
-				return true;
-			}
+				animation_neko_do_sleep();
+			return true;
 
 		case NEKO_SHOCK:
-		default:
-			current_neko = NEKO_STARE;
-			animation_ticks_until_next_frame = 5;
+			animation_neko_do_stare(true);
 			return true;
 	}
+
+	assert(false); /* unreachable. */
+	return false;
 }
 
 /*************
