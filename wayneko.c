@@ -22,12 +22,17 @@
 #endif
 #endif
 
+#define MIN(A, B) (A < B ? A : B)
+
 #include "wlr-layer-shell-unstable-v1.h"
+
+pixman_color_t bg_colour;
+pixman_color_t border_colour;
 
 /* Note: Atlas width must be divisable by 4. */
 #include "neko-bitmap.xbm"
 const int neko_bitmap_stride = neko_bitmap_width / 8;
-const int neko_size = 32;
+const uint8_t neko_size = 32;
 pixman_image_t *neko_atlas = NULL;
 pixman_image_t *neko_atlas_bg_fill = NULL;
 pixman_image_t *neko_atlas_border_fill = NULL;
@@ -70,14 +75,15 @@ struct Surface
 {
 	struct wl_surface *wl_surface;
 	struct zwlr_layer_surface_v1 *layer_surface;
+	uint32_t width, height;
+	uint16_t neko_x, prev_neko_x;
 	bool configured;
 };
 
 struct Surface surface = { 0 };
 
-// TODO wide surface and let the neko run around.
-const uint32_t surface_width = neko_size;
-const uint32_t surface_height = neko_size;
+const uint32_t desired_surface_height = neko_size;
+const uint8_t neko_x_advance = 15;
 
 int ret = EXIT_SUCCESS;
 bool loop = true;
@@ -429,25 +435,6 @@ static void buffer_pool_destroy_all_buffers (void)
  *  Atlas  *
  *         *
  ***********/
-static bool colour_from_hex (pixman_color_t *colour, const char *hex)
-{
-	uint16_t r = 0, g = 0, b = 0, a = 255;
-
-	if ( 4 != sscanf(hex, "0x%02hx%02hx%02hx%02hx", &r, &g, &b, &a)
-			&& 3 != sscanf(hex, "0x%02hx%02hx%02hx", &r, &g, &b) )
-	{
-		fprintf(stderr, "ERROR: Invalid colour: %s\n", hex);
-		return false;
-	}
-
-	colour->alpha = (uint16_t)(((double)a / 255.0) * 65535.0);
-	colour->red   = (uint16_t)((((double)r / 255.0) * 65535.0) * colour->alpha / 0xffff);
-	colour->green = (uint16_t)((((double)g / 255.0) * 65535.0) * colour->alpha / 0xffff);
-	colour->blue  = (uint16_t)((((double)b / 255.0) * 65535.0) * colour->alpha / 0xffff);
-
-	return true;
-}
-
 static void atlas_deinit (void)
 {
 	if ( neko_atlas != NULL )
@@ -482,8 +469,6 @@ static bool atlas_init (void)
 		return false;
 	}
 
-	pixman_color_t bg_colour;
-	colour_from_hex(&bg_colour, "0xFFFFFF");
 	neko_atlas_bg_fill = pixman_image_create_solid_fill(&bg_colour);
 	if ( neko_atlas_bg_fill == NULL )
 	{
@@ -492,8 +477,6 @@ static bool atlas_init (void)
 		return false;
 	}
 
-	pixman_color_t border_colour;
-	colour_from_hex(&border_colour, "0x000000");
 	neko_atlas_border_fill = pixman_image_create_solid_fill(&border_colour);
 	if ( neko_atlas_border_fill == NULL )
 	{
@@ -537,6 +520,16 @@ static void atlas_composite_neko (struct Buffer *buffer, enum Neko neko_type, ui
 	);
 }
 
+static bool animation_can_run_left (void)
+{
+	return surface.neko_x > neko_x_advance;
+}
+
+static bool animation_can_run_right (void)
+{
+	return surface.neko_x < surface.width - neko_size;
+}
+
 /** Returns true if new frame is needed. */
 static bool animation_next_state (void)
 {
@@ -570,16 +563,78 @@ static bool animation_next_state (void)
 					animation_ticks_until_next_frame = 15;
 					return true;
 
+				case 4:
+					if (!animation_can_run_left())
+						return false;
+					current_neko = NEKO_RUN_LEFT_1;
+					surface.prev_neko_x = surface.neko_x;
+					surface.neko_x -= neko_x_advance;
+					return true;
+
+				case 5:
+					if (!animation_can_run_right())
+						return false;
+					current_neko = NEKO_RUN_RIGHT_1;
+					surface.prev_neko_x = surface.neko_x;
+					surface.neko_x += neko_x_advance;
+					return true;
+
 				default:
 					return false;
 			}
 			break;
 
+		case NEKO_RUN_RIGHT_1:
+		case NEKO_RUN_RIGHT_2:
+		case NEKO_RUN_LEFT_1:
+		case NEKO_RUN_LEFT_2:
+			if ( current_neko == NEKO_RUN_LEFT_1 || current_neko == NEKO_RUN_LEFT_2 )
+			{
+				if (!animation_can_run_left())
+				{
+					current_neko = NEKO_STARE;
+					animation_ticks_until_next_frame = 10;
+					return true;
+				}
+			}
+			else
+			{
+				if (!animation_can_run_right())
+				{
+					current_neko = NEKO_STARE;
+					animation_ticks_until_next_frame = 10;
+					return true;
+				}
+			}
+
+			if ( rand() % 4 == 0 )
+			{
+				current_neko = NEKO_STARE;
+				animation_ticks_until_next_frame = 10;
+			}
+			else
+			{
+				switch (current_neko)
+				{
+					case NEKO_RUN_RIGHT_1: current_neko = NEKO_RUN_RIGHT_2; break;
+					case NEKO_RUN_RIGHT_2: current_neko = NEKO_RUN_RIGHT_1; break;
+					case NEKO_RUN_LEFT_1: current_neko = NEKO_RUN_LEFT_2; break;
+					case NEKO_RUN_LEFT_2: current_neko = NEKO_RUN_LEFT_1; break;
+					default: /* unreachable. */ break;
+				}
+				surface.prev_neko_x = surface.neko_x;
+				if ( current_neko == NEKO_RUN_LEFT_1 || current_neko == NEKO_RUN_LEFT_2 )
+					surface.neko_x -= neko_x_advance;
+				else
+					surface.neko_x += neko_x_advance;
+			}
+			return true;
+
 		case NEKO_SLEEP_1:
 		case NEKO_SLEEP_2:
 		case NEKO_SCRATCH_1:
 		case NEKO_SCRATCH_2:
-			if ( rand() % 4 == 0)
+			if ( rand() % 4 == 0 )
 			{
 				if ( current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2 )
 				{
@@ -655,15 +710,21 @@ static void surface_next_frame (void)
 {
 	if (!surface.configured)
 		return;
-	struct Buffer *buffer = buffer_pool_next_buffer(surface_width, surface_height);
+	struct Buffer *buffer = buffer_pool_next_buffer(surface.width, surface.height);
 	if ( buffer == NULL )
 		return;
 
-	atlas_composite_neko(buffer, current_neko, 0, 0);
+	pixman_image_fill_rectangles(PIXMAN_OP_CLEAR, buffer->pixman_image, &bg_colour,
+			1, &(pixman_rectangle16_t){ (int16_t)surface.prev_neko_x, (int16_t)0, (uint16_t)neko_size, (uint16_t)neko_size, });
+	atlas_composite_neko(buffer, current_neko, surface.neko_x, 0);
 
 	wl_surface_set_buffer_scale(surface.wl_surface, 1);
 	wl_surface_attach(surface.wl_surface, buffer->wl_buffer, 0, 0);
-	wl_surface_damage_buffer(surface.wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+	wl_surface_damage_buffer(
+		surface.wl_surface,
+		MIN(surface.neko_x, surface.prev_neko_x), 0,
+		neko_size + neko_x_advance, neko_size
+	);
 	buffer->busy = true;
 	wl_surface_commit(surface.wl_surface);
 }
@@ -683,10 +744,17 @@ static void layer_surface_handle_configure (void *data, struct zwlr_layer_surfac
 	(void)layer_surface;
 
 	zwlr_layer_surface_v1_ack_configure(surface.layer_surface, serial);
-	surface.configured = true;
+	surface.width = width;
+	surface.height = height;
 
-	if ( width != surface_width || height != surface_height )
-		fprintf(stderr, "ERROR: Bad dimensions in configure: %d %d\n", width, height);
+	/* Center neko on first configure. */
+	if (!surface.configured)
+	{
+		surface.neko_x = (uint16_t)((width / 2) - neko_size);
+		surface.prev_neko_x = surface.neko_x;
+	}
+
+	surface.configured = true;
 
 	surface_next_frame();
 }
@@ -723,12 +791,11 @@ static void surface_create (void)
 	);
 	zwlr_layer_surface_v1_set_size(
 		surface.layer_surface,
-		surface_width,
-		surface_height
+		0, desired_surface_height
 	);
 	zwlr_layer_surface_v1_set_anchor(
 		surface.layer_surface,
-		ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM
+		ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT
 	);
 
 	/* Empty input region. */
@@ -805,12 +872,34 @@ static void timespec_diff (struct timespec *a, struct timespec *b, struct timesp
 	}
 }
 
+static bool colour_from_hex (pixman_color_t *colour, const char *hex)
+{
+	uint16_t r = 0, g = 0, b = 0, a = 255;
+
+	if ( 4 != sscanf(hex, "0x%02hx%02hx%02hx%02hx", &r, &g, &b, &a)
+			&& 3 != sscanf(hex, "0x%02hx%02hx%02hx", &r, &g, &b) )
+	{
+		fprintf(stderr, "ERROR: Invalid colour: %s\n", hex);
+		return false;
+	}
+
+	colour->alpha = (uint16_t)(((double)a / 255.0) * 65535.0);
+	colour->red   = (uint16_t)((((double)r / 255.0) * 65535.0) * colour->alpha / 0xffff);
+	colour->green = (uint16_t)((((double)g / 255.0) * 65535.0) * colour->alpha / 0xffff);
+	colour->blue  = (uint16_t)((((double)b / 255.0) * 65535.0) * colour->alpha / 0xffff);
+
+	return true;
+}
+
 int main (void)
 {
 	init_signals();
 
 	wl_list_init(&buffer_pool);
 	srand((unsigned int)time(0));
+
+	colour_from_hex(&bg_colour, "0xFFFFFF");
+	colour_from_hex(&border_colour, "0x000000");
 
 	// TODO command line args
 
