@@ -102,7 +102,8 @@ struct timespec last_tick;
  * keep all those extra buffers around if we can avoid it, as to not have
  * unecessary memory overhead.
  */
-int max_buffer_multiplicity = 3;
+const int max_buffer_multiplicity = 3;
+const int surface_amount = 1;
 
 struct wl_list buffer_pool;
 
@@ -406,6 +407,22 @@ static struct Buffer *buffer_pool_new_buffer (uint32_t width, uint32_t height)
 	return buffer;
 }
 
+static void buffer_pool_cull_buffers (void)
+{
+	int to_remove = wl_list_length(&buffer_pool) - (max_buffer_multiplicity * surface_amount);
+	struct Buffer *buffer, *tmp;
+	wl_list_for_each_safe(buffer, tmp, &buffer_pool, link)
+	{
+		if (to_remove == 0)
+			break;
+		if (buffer->busy)
+			continue;
+		buffer_finish(buffer);
+		buffer_destroy(buffer);
+		to_remove--;
+	}
+}
+
 /**
  * Get a buffer of the specified dimenisons. If possible an idle buffer is
  * reused, otherweise a new one is created.
@@ -416,7 +433,8 @@ static struct Buffer *buffer_pool_next_buffer (uint32_t width, uint32_t height)
 	if ( ret == NULL )
 		ret = buffer_pool_new_buffer(width, height);
 
-	// XXX cull buffers
+	if ( wl_list_length(&buffer_pool) > max_buffer_multiplicity * surface_amount )
+		buffer_pool_cull_buffers();
 
 	return ret;
 }
