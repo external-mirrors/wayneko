@@ -940,7 +940,6 @@ int main (int argc, char *argv[])
 	colour_from_hex(&bg_colour, "0xFFFFFF");
 	colour_from_hex(&border_colour, "0x000000");
 
-	// TODO command line args
 	for (int i = 1; i < argc; i++)
 	{
 		if ( strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-?") == 0 )
