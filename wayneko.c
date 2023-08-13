@@ -549,7 +549,7 @@ static bool animation_next_state (void)
 	switch (current_neko)
 	{
 		case NEKO_STARE:
-			switch (rand() % 25)
+			switch (rand() % 24)
 			{
 				case 0:
 					current_neko = NEKO_SCRATCH_1;
