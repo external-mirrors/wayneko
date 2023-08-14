@@ -911,6 +911,12 @@ static void timespec_diff (struct timespec *a, struct timespec *b, struct timesp
 
 static bool colour_from_hex (pixman_color_t *colour, const char *hex)
 {
+	if ( strlen(hex) != strlen("0xRRGGBBAA") && strlen(hex) != strlen("0xRRGGBB") )
+	{
+		fprintf(stderr, "ERROR: Invalid colour: %s\n", hex);
+		return false;
+	}
+
 	uint16_t r = 0, g = 0, b = 0, a = 255;
 
 	if ( 4 != sscanf(hex, "0x%02hx%02hx%02hx%02hx", &r, &g, &b, &a)
