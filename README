@@ -1,0 +1,5 @@
+wayneko - Neko on Wayland
+
+Display an animated neko cat on the bottom of an output. Requires the Wayland
+server to implement zwlr-layer-shell-unstable-v1.  All code is licensed under
+the GPLv3. The neko bitmaps were taken from public domain.

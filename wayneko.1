@@ -1,0 +1,58 @@
+.TH WAYNEKO 1 2023-08-14 "git.sr.ht/~leon_plickat/wayneko" "General Commands Manual"
+.
+.SH NAME
+.P
+wayneko \- Neko on Wayland
+.
+.
+.SH SYNOPSIS
+.SY wayneko
+.OP \-h
+.OP \-\-help
+.OP \-?
+.YS
+.
+.SY wayneko
+.OP \-\-background\-colour 0xRRGGBB[AA]
+.OP \-\-outline\-colour 0xRRGGBB[AA]
+.YS
+.
+.
+.SH DESCRIPTION
+.P
+Display an animated neko cat on the bottom of an output.
+.P
+Requires the Wayland server to implement \fBzwlr-layer-shell-unstable-v1\fR.
+.
+.
+.SH OPTIONS
+.P
+\fB\-h\fR, \fB\-\-help\fR, \fB\-?\fR
+.RS
+Print help text and exit.
+.RE
+.
+.P
+\fB\-\-background\-colour\fR \fI0xRRGGBB[AA]\fR
+.RS
+Set the background fill colour using a hexadecimal colour code prefixed by '0x'.
+Alpha value is optional.
+.RE
+.
+.P
+\fB\-\-outline\-colour\fR \fI0xRRGGBB[AA]\fR
+.RS
+Set the outline colour using a hexadecimal colour code prefixed by '0x'.
+Alpha value is optional.
+.RE
+.
+.
+.SH AUTHOR
+.P
+Code by
+.MT leonhenrik.plickat@stud.uni-goettingen.de
+Leon Henrik Plickat
+.ME .
+.
+.P
+Neko bitmaps taken from public domain.
