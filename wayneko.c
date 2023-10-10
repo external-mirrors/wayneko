@@ -63,6 +63,16 @@ const uint16_t animation_timeout = 200;
 size_t animation_ticks_until_next_frame = 10;
 enum Neko current_neko = NEKO_STARE;
 
+struct Seat
+{
+	struct wl_list link;
+	struct wl_seat *wl_seat;
+	struct wl_pointer *wl_pointer;
+	uint32_t global_name;
+	bool on_surface;
+	uint32_t surface_x;
+};
+
 struct Buffer
 {
 	struct wl_list link;
@@ -100,6 +110,8 @@ struct wl_compositor *wl_compositor = NULL;
 struct wl_shm *wl_shm = NULL;
 struct zwlr_layer_shell_v1 *layer_shell = NULL;
 struct timespec last_tick;
+
+struct wl_list seats;
 
 /* The amount of buffers per surface we consider the reasonable upper limit.
  * Some compositors sometimes tripple-buffer, so three seems to be ok.
@@ -457,6 +469,121 @@ static void buffer_pool_destroy_all_buffers (void)
 	}
 }
 
+/**********
+ *        *
+ *  Seat  *
+ *        *
+ **********/
+static struct Seat *seat_from_global_name (uint32_t name)
+{
+	struct Seat *seat;
+	wl_list_for_each(seat, &seats, link)
+		if ( seat->global_name == name )
+			return seat;
+	return NULL;
+}
+
+static void seat_release_pointer (struct Seat *seat)
+{
+	seat->on_surface = false;
+	if (seat->wl_pointer)
+	{
+		wl_pointer_release(seat->wl_pointer);
+		seat->wl_pointer = NULL;
+	}
+}
+
+static void pointer_handle_enter (void *data, struct wl_pointer *wl_pointer,
+		uint32_t serial, struct wl_surface *wl_surface,
+		wl_fixed_t x, wl_fixed_t y)
+{
+	struct Seat *seat = (struct Seat *)data;
+	assert(wl_surface == surface.wl_surface);
+	seat->on_surface = true;
+	seat->surface_x = (uint32_t)wl_fixed_to_int(x);
+
+	/* Abort current animation frame. */
+	animation_ticks_until_next_frame = 0;
+}
+
+static void pointer_handle_leave (void *data, struct wl_pointer *wl_pointer,
+		uint32_t serial, struct wl_surface *wl_surface)
+{
+	struct Seat *seat = (struct Seat *)data;
+	assert(wl_surface == surface.wl_surface);
+	assert(seat->on_surface == true);
+	seat->on_surface = false;
+}
+
+static void pointer_handle_motion(void *data, struct wl_pointer *wl_pointer,
+		uint32_t time, wl_fixed_t x, wl_fixed_t y)
+{
+	struct Seat *seat = (struct Seat *)data;
+	assert(seat->on_surface == true);
+	seat->surface_x = (uint32_t)wl_fixed_to_int(x);
+}
+
+static const struct wl_pointer_listener pointer_listener = {
+	.enter         = pointer_handle_enter,
+	.leave         = pointer_handle_leave,
+	.motion        = pointer_handle_motion,
+	.axis_discrete = noop,
+	.axis          = noop,
+	.axis_source   = noop,
+	.axis_stop     = noop,
+	.button        = noop,
+	.frame         = noop,
+};
+
+static void seat_bind_pointer (struct Seat *seat)
+{
+	seat->wl_pointer = wl_seat_get_pointer(seat->wl_seat);
+	wl_pointer_add_listener(seat->wl_pointer, &pointer_listener, seat);
+}
+
+static void seat_handle_capabilities (void *data, struct wl_seat *wl_seat,
+		uint32_t capabilities)
+{
+	struct Seat *seat = (struct Seat *)data;
+
+	if ( capabilities & WL_SEAT_CAPABILITY_POINTER )
+		seat_bind_pointer(seat);
+	else
+		seat_release_pointer(seat);
+}
+
+static const struct wl_seat_listener seat_listener = {
+	.capabilities = seat_handle_capabilities,
+	.name = noop,
+};
+
+static void seat_new (struct wl_seat *wl_seat, uint32_t name)
+{
+	struct Seat *seat = calloc(1, sizeof(struct Seat));
+	if ( seat == NULL )
+	{
+		fprintf(stderr, "ERROR: calloc(): %s\n", strerror(errno));
+		return;
+	}
+
+	seat->wl_seat = wl_seat;
+	seat->global_name = name;
+	seat->on_surface = false;
+
+	wl_seat_set_user_data(seat->wl_seat, seat);
+	wl_list_insert(&seats, &seat->link);
+
+	wl_seat_add_listener(wl_seat, &seat_listener, seat);
+}
+
+static void seat_destroy (struct Seat *seat)
+{
+	seat_release_pointer(seat);
+	wl_seat_destroy(seat->wl_seat);
+	wl_list_remove(&seat->link);
+	free(seat);
+}
+
 /***********
  *         *
  *  Atlas  *
@@ -618,14 +745,54 @@ static void animation_neko_do_scratch (void)
 }
 
 /** Returns true if new frame is needed. */
-static bool animation_next_state (void)
+static bool animation_next_state_with_hotspot (uint32_t x)
 {
-	if ( animation_ticks_until_next_frame > 0 )
+	switch (current_neko)
 	{
-		animation_ticks_until_next_frame--;
-		return false;
-	}
+		case NEKO_SHOCK:
+		case NEKO_RUN_RIGHT_1:
+		case NEKO_RUN_RIGHT_2:
+		case NEKO_RUN_LEFT_1:
+		case NEKO_RUN_LEFT_2:
+			bool need_frame = current_neko != NEKO_STARE;
+			if ( x < surface.neko_x )
+			{
+				if (!animation_can_run_left())
+				{
+					animation_neko_do_stare(true);
+					return need_frame;
+				}
+				animation_neko_advance_left();
+				animation_neko_do_run_left();
+				return true;
+			}
+			else if ( x > surface.neko_x + neko_size )
+			{
+				if (!animation_can_run_right())
+				{
+					animation_neko_do_stare(true);
+					return need_frame;
+				}
+				animation_neko_advance_right();
+				animation_neko_do_run_right();
+				return true;
+			}
+			else
+			{
+				animation_neko_do_stare(true);
+				return need_frame;
+			}
 
+		default:
+			animation_neko_do_shock();
+			return true;
+
+	}
+}
+
+/** Returns true if new frame is needed. */
+static bool animation_next_state_normal (void)
+{
 	switch (current_neko)
 	{
 		case NEKO_STARE:
@@ -701,7 +868,6 @@ static bool animation_next_state (void)
 				animation_neko_do_sleep();
 			return true;
 
-
 		case NEKO_SCRATCH_1:
 		case NEKO_SCRATCH_2:
 			if ( rand() % 4 == 0 )
@@ -711,14 +877,14 @@ static bool animation_next_state (void)
 			return true;
 
 		case NEKO_THINK:
-			if ( rand() %2 == 0 )
+			if ( rand() % 2 == 0 )
 				animation_neko_do_stare(false);
 			else
 				animation_neko_do_shock();
 			return true;
 
 		case NEKO_YAWN:
-			if ( rand() %2 == 0 )
+			if ( rand() % 2 == 0 )
 				animation_neko_do_stare(false);
 			else
 				animation_neko_do_sleep();
@@ -731,6 +897,24 @@ static bool animation_next_state (void)
 
 	assert(false); /* unreachable. */
 	return false;
+}
+
+/** Returns true if new frame is needed. */
+static bool animation_next_state (void)
+{
+	if ( animation_ticks_until_next_frame > 0 )
+	{
+		animation_ticks_until_next_frame--;
+		return false;
+	}
+
+	struct Seat *seat;
+	wl_list_for_each(seat, &seats, link)
+	{
+		if (seat->on_surface)
+			return animation_next_state_with_hotspot(seat->surface_x);
+	}
+	return animation_next_state_normal();
 }
 
 /*************
@@ -835,11 +1019,6 @@ static void surface_create (void)
 		ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT
 	);
 
-	/* Empty input region. */
-	struct wl_region *region = wl_compositor_create_region(wl_compositor);
-	wl_surface_set_input_region(surface.wl_surface, region);
-	wl_region_destroy(region);
-
 	wl_surface_commit(surface.wl_surface);
 }
 
@@ -857,13 +1036,24 @@ static void registry_handle_global (void *data, struct wl_registry *registry,
 		wl_compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
 	else if ( strcmp(interface, wl_shm_interface.name) == 0 )
 		wl_shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+	else if ( strcmp(interface, wl_seat_interface.name) == 0 )
+	{
+		struct wl_seat *wl_seat = wl_registry_bind(registry, name, &wl_seat_interface, 7);
+		seat_new(wl_seat, name);
+	}
+}
+
+static void registry_handle_global_remove (void *data, struct wl_registry *registry,
+		uint32_t name)
+{
+	struct Seat *seat = seat_from_global_name(name);
+	if ( seat != NULL )
+		seat_destroy(seat);
 }
 
 static const struct wl_registry_listener registry_listener = {
 	.global = registry_handle_global,
-
-	/* We do not bind interfaces that - realistically - will ever disappear. */
-	.global_remove = noop,
+	.global_remove = registry_handle_global_remove,
 };
 
 static char *check_for_interfaces (void)
@@ -978,6 +1168,7 @@ int main (int argc, char *argv[])
 		}
 	}
 
+	wl_list_init(&seats);
 	wl_list_init(&buffer_pool);
 	srand((unsigned int)time(0));
 
