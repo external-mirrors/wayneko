@@ -793,6 +793,16 @@ static bool animation_next_state_with_hotspot (uint32_t x)
 /** Returns true if new frame is needed. */
 static bool animation_next_state_normal (void)
 {
+	/* Neko likes to sleep at night. */
+	const long now = time(NULL);
+	struct tm tm = *localtime(&now);
+	if ( tm.tm_hour >= 23 || tm.tm_hour <= 6 )
+	{
+		const bool need_frame = current_neko != NEKO_SLEEP_1 && current_neko != NEKO_SLEEP_2;
+		animation_neko_do_sleep();
+		return need_frame;
+	}
+
 	switch (current_neko)
 	{
 		case NEKO_STARE:
