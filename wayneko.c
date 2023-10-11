@@ -744,48 +744,88 @@ static void animation_neko_do_scratch (void)
 	animation_ticks_until_next_frame = 0;
 }
 
+static bool animtation_neko_wants_sleep (void)
+{
+	/* Neko likes to sleep at night. */
+	const long now = time(NULL);
+	struct tm tm = *localtime(&now);
+	return tm.tm_hour >= 23 || tm.tm_hour <= 6;
+}
+
 /** Returns true if new frame is needed. */
 static bool animation_next_state_with_hotspot (uint32_t x)
 {
-	switch (current_neko)
+	if ( x < surface.neko_x ) /* Cursor left of neko. */
 	{
-		case NEKO_SHOCK:
-		case NEKO_RUN_RIGHT_1:
-		case NEKO_RUN_RIGHT_2:
-		case NEKO_RUN_LEFT_1:
-		case NEKO_RUN_LEFT_2:
-			bool need_frame = current_neko != NEKO_STARE;
-			if ( x < surface.neko_x )
-			{
+		switch (current_neko)
+		{
+			case NEKO_SHOCK:
+			case NEKO_RUN_LEFT_1:
+			case NEKO_RUN_LEFT_2:
 				if (!animation_can_run_left())
 				{
 					animation_neko_do_stare(true);
-					return need_frame;
+					return true;
 				}
 				animation_neko_advance_left();
 				animation_neko_do_run_left();
 				return true;
-			}
-			else if ( x > surface.neko_x + neko_size )
-			{
+
+			default:
+				animation_neko_do_shock();
+				return true;
+		}
+	}
+	else if ( x > surface.neko_x + neko_size ) /* Cursor right of neko. */
+	{
+		switch (current_neko)
+		{
+			case NEKO_SHOCK:
+			case NEKO_RUN_RIGHT_1:
+			case NEKO_RUN_RIGHT_2:
 				if (!animation_can_run_right())
 				{
 					animation_neko_do_stare(true);
-					return need_frame;
+					return true;
 				}
 				animation_neko_advance_right();
 				animation_neko_do_run_right();
 				return true;
-			}
-			else
-			{
-				animation_neko_do_stare(true);
-				return need_frame;
-			}
 
-		default:
-			animation_neko_do_shock();
-			return true;
+			default:
+				animation_neko_do_shock();
+				return true;
+		}
+	}
+	else /* Cursor on neko. */
+	{
+		switch (current_neko)
+		{
+			case NEKO_SLEEP_1:
+			case NEKO_SLEEP_2:
+			case NEKO_YAWN:
+				if (animtation_neko_wants_sleep())
+					animation_neko_do_sleep();
+				else
+					animation_neko_do_stare(false);
+				return true;
+
+			case NEKO_STARE:
+				if (animtation_neko_wants_sleep())
+				{
+					animation_neko_do_yawn();
+					return true;
+				}
+				else
+				{
+					animation_neko_do_stare(false);
+					return false;
+				}
+
+			default:
+				animation_neko_do_stare(false);
+				return true;
+		}
 
 	}
 }
@@ -793,14 +833,30 @@ static bool animation_next_state_with_hotspot (uint32_t x)
 /** Returns true if new frame is needed. */
 static bool animation_next_state_normal (void)
 {
-	/* Neko likes to sleep at night. */
-	const long now = time(NULL);
-	struct tm tm = *localtime(&now);
-	if ( tm.tm_hour >= 23 || tm.tm_hour <= 6 )
+	/* Sleep at night, but with a small chance to wake up and do something.
+         * If the neko is already awake, slightly higher chance to stay awake.
+	 */
+	const bool neko_is_sleeping = current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2;
+	if ( animtation_neko_wants_sleep() && (( neko_is_sleeping && rand() % 5 != 0 ) || ( !neko_is_sleeping && rand() % 2 != 0 )) )
 	{
-		const bool need_frame = current_neko != NEKO_SLEEP_1 && current_neko != NEKO_SLEEP_2;
-		animation_neko_do_sleep();
-		return need_frame;
+		switch (current_neko)
+		{
+			case NEKO_RUN_RIGHT_1:
+			case NEKO_RUN_RIGHT_2:
+			case NEKO_RUN_LEFT_1:
+			case NEKO_RUN_LEFT_2:
+				animation_neko_do_stare(true);
+				return true;
+
+			case NEKO_SLEEP_1:
+			case NEKO_SLEEP_2:
+				animation_neko_do_sleep();
+				return true;
+
+			default:
+				animation_neko_do_yawn();
+				return true;
+		}
 	}
 
 	switch (current_neko)
