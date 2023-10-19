@@ -30,6 +30,7 @@ const char usage[] =
 	"  -h, --help\n"
 	"  --background-colour 0xRRGGBB[AA]\n"
 	"  --outline-colour    0xRRGGBB[AA]\n"
+	"  --type              neko|inu|random\n"
 	"\n";
 
 pixman_color_t bg_colour;
@@ -42,6 +43,12 @@ const uint8_t neko_size = 32;
 pixman_image_t *neko_atlas = NULL;
 pixman_image_t *neko_atlas_bg_fill = NULL;
 pixman_image_t *neko_atlas_border_fill = NULL;
+
+enum Type
+{
+	NEKO = 0,
+	INU = 2,
+};
 
 enum Neko
 {
@@ -62,6 +69,7 @@ enum Neko
 const uint16_t animation_timeout = 200;
 size_t animation_ticks_until_next_frame = 10;
 enum Neko current_neko = NEKO_STARE;
+enum Type type = INU;
 
 struct Seat
 {
@@ -652,7 +660,7 @@ static void atlas_composite_neko (struct Buffer *buffer, enum Neko neko_type, ui
 		0,                     /* Source x. */
 		0,                     /* Source y. */
 		(uint16_t)neko_type * neko_size, /* Mask x. */
-		neko_size,             /* Mask y. */
+		neko_size + (uint16_t)type * neko_size, /* Mask y. */
 		x,                     /* Destination x. */
 		y,                     /* Destination y. */
 		neko_size,             /* Source width. */
@@ -666,7 +674,7 @@ static void atlas_composite_neko (struct Buffer *buffer, enum Neko neko_type, ui
 		0,
 		0,
 		(uint16_t)neko_type * neko_size,
-		0,
+		(uint16_t)type * neko_size,
 		x,
 		y,
 		neko_size,
@@ -1210,6 +1218,8 @@ int main (int argc, char *argv[])
 	colour_from_hex(&bg_colour, "0xFFFFFF");
 	colour_from_hex(&border_colour, "0x000000");
 
+	srand((unsigned int)time(0));
+
 	for (int i = 1; i < argc; i++)
 	{
 		if ( strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-?") == 0 )
@@ -1227,6 +1237,28 @@ int main (int argc, char *argv[])
 			if (!colour_from_flag(&border_colour, argc, argv, &i))
 				return EXIT_FAILURE;
 		}
+		else if ( strcmp(argv[i], "--type") == 0 )
+		{
+			if ( argc == i + 1 )
+			{
+				fputs("ERROR: Flag '--type' requires a parameter.\n", stderr);
+				return EXIT_FAILURE;
+			}
+
+			if ( strcmp(argv[i+1], "neko") == 0 )
+				type = NEKO;
+			else if ( strcmp(argv[i+1], "inu") == 0 )
+				type = INU;
+			else if ( strcmp(argv[i+1], "random") == 0 )
+				type = rand() % 2 == 0 ? NEKO : INU;
+			else
+			{
+				fprintf(stderr, "ERROR: Unknown argument '%s' for flag '--type'.\n", argv[i+1]);
+				return EXIT_FAILURE;
+			}
+
+			i++;
+		}
 		else
 		{
 			fprintf(stderr, "ERROR: Unknown option: %s\n", argv[i]);
@@ -1236,7 +1268,6 @@ int main (int argc, char *argv[])
 
 	wl_list_init(&seats);
 	wl_list_init(&buffer_pool);
-	srand((unsigned int)time(0));
 
 	if (!atlas_init())
 		return EXIT_FAILURE;
