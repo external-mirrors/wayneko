@@ -69,7 +69,8 @@ enum Neko
 const uint16_t animation_timeout = 200;
 size_t animation_ticks_until_next_frame = 10;
 enum Neko current_neko = NEKO_STARE;
-enum Type type = INU;
+enum Type type = NEKO;
+bool follow_pointer = true;
 
 struct Seat
 {
@@ -1093,6 +1094,13 @@ static void surface_create (void)
 		ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT
 	);
 
+	if (! follow_pointer)
+	{
+		struct wl_region *region = wl_compositor_create_region(wl_compositor);
+		wl_surface_set_input_region(surface.wl_surface, region);
+		wl_region_destroy(region);
+	}
+
 	wl_surface_commit(surface.wl_surface);
 }
 
@@ -1198,16 +1206,24 @@ static bool colour_from_hex (pixman_color_t *colour, const char *hex)
 	return true;
 }
 
-static bool colour_from_flag(pixman_color_t *colour, int argc, char *argv[], int *i)
+static char *get_argument (int argc, char *argv[], int *i)
 {
 	if ( argc == (*i) + 1 )
 	{
 		fprintf(stderr, "ERROR: Flag '%s' requires a parameter.\n", argv[(*i)]);
-		return false;
+		return NULL;
 	}
-	if (!colour_from_hex(colour, argv[(*i)+1]))
-		return false;
 	(*i)++;
+	return argv[(*i)];
+}
+
+static bool colour_from_flag (pixman_color_t *colour, int argc, char *argv[], int *i)
+{
+	const char *hex = get_argument(argc, argv, i);
+	if ( hex == NULL )
+		return false;
+	if (!colour_from_hex(colour, hex))
+		return false;
 	return true;
 }
 
@@ -1239,25 +1255,37 @@ int main (int argc, char *argv[])
 		}
 		else if ( strcmp(argv[i], "--type") == 0 )
 		{
-			if ( argc == i + 1 )
-			{
-				fputs("ERROR: Flag '--type' requires a parameter.\n", stderr);
+			const char *t = get_argument(argc, argv, &i);
+			if ( t == NULL )
 				return EXIT_FAILURE;
-			}
 
-			if ( strcmp(argv[i+1], "neko") == 0 )
+			if ( strcmp(t, "neko") == 0 )
 				type = NEKO;
-			else if ( strcmp(argv[i+1], "inu") == 0 )
+			else if ( strcmp(t, "inu") == 0 )
 				type = INU;
-			else if ( strcmp(argv[i+1], "random") == 0 )
+			else if ( strcmp(t, "random") == 0 )
 				type = rand() % 2 == 0 ? NEKO : INU;
 			else
 			{
-				fprintf(stderr, "ERROR: Unknown argument '%s' for flag '--type'.\n", argv[i+1]);
+				fprintf(stderr, "ERROR: Unknown argument '%s' for flag '--type'.\n", t);
 				return EXIT_FAILURE;
 			}
+		}
+		else if ( strcmp(argv[i], "--follow-pointer") == 0 )
+		{
+			const char *t = get_argument(argc, argv, &i);
+			if ( t == NULL )
+				return EXIT_FAILURE;
 
-			i++;
+			if ( strcmp(t, "yes") == 0 || strcmp(t, "on") == 0 || strcmp(t, "true") == 0 )
+				follow_pointer = true;
+			else if ( strcmp(t, "no") == 0 || strcmp(t, "off") == 0 || strcmp(t, "false") == 0 )
+				follow_pointer = false;
+			else
+			{
+				fprintf(stderr, "ERROR: Unknown argument '%s' for flag '--follow-pointer'.\n", t);
+				return EXIT_FAILURE;
+			}
 		}
 		else
 		{
