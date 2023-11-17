@@ -31,6 +31,7 @@ const char usage[] =
 	"  --background-colour 0xRRGGBB[AA]\n"
 	"  --outline-colour    0xRRGGBB[AA]\n"
 	"  --type              neko|inu|random\n"
+	"  --survive-close\n"
 	"\n";
 
 pixman_color_t bg_colour;
@@ -71,6 +72,7 @@ size_t animation_ticks_until_next_frame = 10;
 enum Neko current_neko = NEKO_STARE;
 enum Type type = NEKO;
 bool follow_pointer = true;
+bool recreate_surface_on_close = false;
 
 struct Seat
 {
@@ -1040,6 +1042,7 @@ static void surface_destroy (void)
 		wl_surface_destroy(surface.wl_surface );
 		surface.wl_surface = NULL;
 	}
+	surface.configured = false;
 }
 
 static void layer_surface_handle_configure (void *data, struct zwlr_layer_surface_v1 *layer_surface,
@@ -1064,12 +1067,20 @@ static void layer_surface_handle_configure (void *data, struct zwlr_layer_surfac
 	surface_next_frame();
 }
 
+static const struct wl_callback_listener sync_callback_listener;
 static void layer_surface_handle_closed (void *data, struct zwlr_layer_surface_v1 *layer_surface)
 {
 	(void)data;
 	(void)layer_surface;
 	surface_destroy();
-	loop = false;
+
+	if (recreate_surface_on_close)
+	{
+		sync_callback = wl_display_sync(wl_display);
+		wl_callback_add_listener(sync_callback, &sync_callback_listener, NULL);
+	}
+	else
+		loop = false;
 }
 
 const struct zwlr_layer_surface_v1_listener layer_surface_listener = {
@@ -1253,6 +1264,8 @@ int main (int argc, char *argv[])
 			fputs(usage, stderr);
 			return EXIT_SUCCESS;
 		}
+		else if ( strcmp(argv[i], "--survive-close") == 0 )
+			recreate_surface_on_close = true;
 		else if ( strcmp(argv[i], "--background-colour") == 0 )
 		{
 			if (!colour_from_flag(&bg_colour, argc, argv, &i))

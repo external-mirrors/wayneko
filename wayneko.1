@@ -17,6 +17,7 @@ wayneko \- Neko on Wayland
 .OP \-\-outline\-colour 0xRRGGBB[AA]
 .OP \-\-type neko|inu|random
 .OP \-\-follow\-pointer true|false
+.OP \-\-survive\-close
 .YS
 .
 .
@@ -61,6 +62,15 @@ This option lets you choose between neko and her friend inu.
 \fB\-\-follow\-pointer\fR \fBtrue\fR|\fBfalse\fR
 .RS
 Set whether neko follows the pointer when it approaches the bottom of the output
+.RE
+.
+.P
+\fB\-\-survive\-close\fR
+.RS
+If this flag is used, wayneko will recreate the surface after it has been closed.
+This allows neko to migrate outputs should the one she is currently on be
+disconnected, but may cause some undesired behaviour should the server try to
+close the surface for a different reason.
 .RE
 .
 .
