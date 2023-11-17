@@ -1001,6 +1001,9 @@ static void surface_next_frame (void)
 {
 	if (!surface.configured)
 		return;
+
+	assert(surface.wl_surface != NULL);
+
 	struct Buffer *buffer = buffer_pool_next_buffer(surface.width, surface.height);
 	if ( buffer == NULL )
 		return;
@@ -1028,9 +1031,15 @@ static void surface_next_frame (void)
 static void surface_destroy (void)
 {
 	if ( surface.layer_surface != NULL )
+	{
 		zwlr_layer_surface_v1_destroy(surface.layer_surface);
+		surface.layer_surface = NULL;
+	}
 	if ( surface.wl_surface != NULL )
+	{
 		wl_surface_destroy(surface.wl_surface );
+		surface.wl_surface = NULL;
+	}
 }
 
 static void layer_surface_handle_configure (void *data, struct zwlr_layer_surface_v1 *layer_surface,
@@ -1060,6 +1069,7 @@ static void layer_surface_handle_closed (void *data, struct zwlr_layer_surface_v
 	(void)data;
 	(void)layer_surface;
 	surface_destroy();
+	loop = false;
 }
 
 const struct zwlr_layer_surface_v1_listener layer_surface_listener = {
