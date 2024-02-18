@@ -31,6 +31,8 @@ const char usage[] =
 	"  --background-colour 0xRRGGBB[AA]\n"
 	"  --outline-colour    0xRRGGBB[AA]\n"
 	"  --type              neko|inu|random\n"
+	"  --layer             background|bottom|top|overlay\n"
+	"  --follow-pointer    true|false\n"
 	"  --survive-close\n"
 	"\n";
 
@@ -73,6 +75,7 @@ enum Neko current_neko = NEKO_STARE;
 enum Type type = NEKO;
 bool follow_pointer = true;
 bool recreate_surface_on_close = false;
+enum zwlr_layer_shell_v1_layer layer = ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM;
 
 struct Seat
 {
@@ -1097,7 +1100,7 @@ static void surface_create (void)
 		layer_shell,
 		surface.wl_surface,
 		NULL,
-		ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
+		layer,
 		"wayneko"
 	);
 
@@ -1309,6 +1312,18 @@ int main (int argc, char *argv[])
 				fprintf(stderr, "ERROR: Unknown argument '%s' for flag '--follow-pointer'.\n", t);
 				return EXIT_FAILURE;
 			}
+		}
+		else if ( strcmp(argv[i], "--layer") == 0 )
+		{
+			const char *a = get_argument(argc, argv, &i);
+			if ( strcmp(a, "background") == 0 )
+				layer = ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND;
+			else if ( strcmp(a, "bottom") == 0 )
+				layer = ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM;
+			else if ( strcmp(a, "top") == 0 )
+				layer = ZWLR_LAYER_SHELL_V1_LAYER_TOP;
+			else if ( strcmp(a, "overlay") == 0 )
+				layer = ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY;
 		}
 		else
 		{

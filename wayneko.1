@@ -16,6 +16,7 @@ wayneko \- Neko on Wayland
 .OP \-\-background\-colour 0xRRGGBB[AA]
 .OP \-\-outline\-colour 0xRRGGBB[AA]
 .OP \-\-type neko|inu|random
+.OP \-\-layer background|bottom|top|overlay
 .OP \-\-follow\-pointer true|false
 .OP \-\-survive\-close
 .YS
@@ -56,6 +57,16 @@ Alpha value is optional.
 \fB\-\-type\fR \fBneko\fR|\fBinu\fR|\fBrandom\fR
 .RS
 This option lets you choose between neko and her friend inu.
+.RE
+.
+.P
+\fB\-\-layer\fR \fBbackground\fR|\fBbottom\fR|\fBtop\fR|\fBoverlay\fR
+.RS
+Set the layer for the surface.
+Defaults to bottom.
+Bottom is typically beneath regular windows and top above them.
+Overlay is usually displayed even over fullscreen windows.
+Background may conflict with wallpaper clients.
 .RE
 .
 .P
