@@ -4,10 +4,14 @@ PREFIX=/usr/local
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man
 
-CFLAGS=-Wall -Werror -Wextra -Wpedantic -Wno-unused-parameter -Wconversion -Wformat-security -Wformat -Wsign-conversion -Wfloat-conversion -Wunused-result $(shell pkg-config --cflags pixman-1)
+CFLAGS=-Wall -Werror -Wextra -Wpedantic -Wno-unused-parameter -Wconversion $\
+	-Wformat-security -Wformat -Wsign-conversion -Wfloat-conversion $\
+	-Wunused-result $(shell pkg-config --cflags pixman-1)
 LIBS=-lwayland-client $(shell pkg-config --libs pixman-1) -lrt
-OBJ=wayneko.o wlr-layer-shell-unstable-v1.o xdg-shell.o
-GEN=wlr-layer-shell-unstable-v1.c wlr-layer-shell-unstable-v1.h xdg-shell.c xdg-shell.h
+OBJ=wayneko.o wlr-layer-shell-unstable-v1.o xdg-shell.o ext-idle-notify-v1.o
+GEN=wlr-layer-shell-unstable-v1.c wlr-layer-shell-unstable-v1.h $\
+	xdg-shell.c xdg-shell.h $\
+	ext-idle-notify-v1.c ext-idle-notify-v1.h
 
 wayneko: $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $(OBJ) $(LIBS)

@@ -24,6 +24,7 @@
 #define MIN(A, B) (A < B ? A : B)
 
 #include "wlr-layer-shell-unstable-v1.h"
+#include "ext-idle-notify-v1.h"
 
 const char usage[] =
 	"Usage: wayneko [options...]\n"
@@ -77,6 +78,9 @@ bool follow_pointer = true;
 bool recreate_surface_on_close = false;
 enum zwlr_layer_shell_v1_layer layer = ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM;
 
+struct ext_idle_notifier_v1 *idle_notifier = NULL;
+const uint32_t neko_idle_timeout_ms = 180000; /* 3 minutes. */ // TODO make configurable
+
 struct Seat
 {
 	struct wl_list link;
@@ -85,6 +89,8 @@ struct Seat
 	uint32_t global_name;
 	bool on_surface;
 	uint32_t surface_x;
+	struct ext_idle_notification_v1 *idle_notification;
+	bool currently_idle;
 };
 
 struct Buffer
@@ -571,6 +577,41 @@ static const struct wl_seat_listener seat_listener = {
 	.name = noop,
 };
 
+static void ext_idle_notification_handle_idled (void *data,
+		struct ext_idle_notification_v1 *ext_idle_notification_v1)
+{
+	(void)ext_idle_notification_v1;
+	struct Seat *seat = (struct Seat *)data;
+	assert(!seat->currently_idle);
+	seat->currently_idle = true;
+}
+
+static void ext_idle_notification_handle_resumed (void *data,
+		struct ext_idle_notification_v1 *ext_idle_notification_v1)
+{
+	(void)ext_idle_notification_v1;
+	struct Seat *seat = (struct Seat *)data;
+	assert(seat->currently_idle);
+	seat->currently_idle = false;
+}
+
+static const struct ext_idle_notification_v1_listener ext_idle_notification_listener = {
+	.idled = ext_idle_notification_handle_idled,
+	.resumed = ext_idle_notification_handle_resumed,
+};
+
+static void seat_add_idle (struct Seat *seat)
+{
+	assert(seat->idle_notification == NULL);
+	assert(!seat->currently_idle);
+	seat->idle_notification = ext_idle_notifier_v1_get_idle_notification(
+		idle_notifier, neko_idle_timeout_ms, seat->wl_seat
+	);
+	ext_idle_notification_v1_add_listener(
+		seat->idle_notification, &ext_idle_notification_listener, seat
+	);
+}
+
 static void seat_new (struct wl_seat *wl_seat, uint32_t name)
 {
 	struct Seat *seat = calloc(1, sizeof(struct Seat));
@@ -584,6 +625,13 @@ static void seat_new (struct wl_seat *wl_seat, uint32_t name)
 	seat->global_name = name;
 	seat->on_surface = false;
 
+	/* Create idle_notification if we have the global idle_notifier. Note
+	 * that during the initial registry burst seats may be advertised before
+	 * the idle protocol global, so this also has to be done on first sync.
+	 */
+	if ( idle_notifier != NULL )
+		seat_add_idle(seat);
+
 	wl_seat_set_user_data(seat->wl_seat, seat);
 	wl_list_insert(&seats, &seat->link);
 
@@ -592,6 +640,8 @@ static void seat_new (struct wl_seat *wl_seat, uint32_t name)
 
 static void seat_destroy (struct Seat *seat)
 {
+	if ( seat->idle_notification != NULL )
+		ext_idle_notification_v1_destroy(seat->idle_notification);
 	seat_release_pointer(seat);
 	wl_seat_destroy(seat->wl_seat);
 	wl_list_remove(&seat->link);
@@ -764,6 +814,25 @@ static bool animtation_neko_wants_sleep (void)
 	const long now = time(NULL);
 	struct tm tm = *localtime(&now);
 	return tm.tm_hour >= 23 || tm.tm_hour <= 6;
+}
+
+/** Returns true if new frame is needed. */
+static bool animation_next_state_with_idle (void)
+{
+	fprintf(stderr, "with idle!!!\n");
+	/* If no one is there (system is idle), neko gets bored and will sleep. */
+	switch (current_neko)
+	{
+		case NEKO_SLEEP_1:
+		case NEKO_SLEEP_2:
+		case NEKO_YAWN:
+			animation_neko_do_sleep();
+			return true;
+
+		default:
+			animation_neko_do_yawn();
+			return true;
+	}
 }
 
 /** Returns true if new frame is needed. */
@@ -991,6 +1060,11 @@ static bool animation_next_state (void)
 	struct Seat *seat;
 	wl_list_for_each(seat, &seats, link)
 	{
+		if (seat->currently_idle)
+			return animation_next_state_with_idle();
+	}
+	wl_list_for_each(seat, &seats, link)
+	{
 		if (seat->on_surface)
 			return animation_next_state_with_hotspot(seat->surface_x);
 	}
@@ -1142,6 +1216,8 @@ static void registry_handle_global (void *data, struct wl_registry *registry,
 		wl_compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
 	else if ( strcmp(interface, wl_shm_interface.name) == 0 )
 		wl_shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+	else if ( strcmp(interface, ext_idle_notifier_v1_interface.name) == 0 )
+		idle_notifier = wl_registry_bind(registry, name, &ext_idle_notifier_v1_interface, 1);
 	else if ( strcmp(interface, wl_seat_interface.name) == 0 )
 	{
 		struct wl_seat *wl_seat = wl_registry_bind(registry, name, &wl_seat_interface, 7);
@@ -1185,6 +1261,20 @@ static void sync_handle_done (void *data, struct wl_callback *wl_callback, uint3
 		loop = false;
 		ret = EXIT_FAILURE;
 		return;
+	}
+
+	/* During the initial registry burst, seats may be advertised before
+	 * the global idle objects. So we need to go over all seats again and
+	 * add the idle_notification.
+	 */
+	if ( idle_notifier != NULL )
+	{
+		struct Seat *seat;
+		wl_list_for_each(seat, &seats, link)
+		{
+			if ( seat->idle_notification == NULL )
+				seat_add_idle(seat);
+		}
 	}
 
 	surface_create();
@@ -1459,6 +1549,8 @@ exit_main_loop:
 		wl_shm_destroy(wl_shm);
 	if ( layer_shell != NULL )
 		zwlr_layer_shell_v1_destroy(layer_shell);
+	if ( idle_notifier != NULL )
+		ext_idle_notifier_v1_destroy(idle_notifier);
 	if ( sync_callback != NULL )
 		wl_callback_destroy(sync_callback);
 	if ( wl_registry != NULL )
