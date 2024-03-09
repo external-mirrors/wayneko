@@ -819,7 +819,6 @@ static bool animtation_neko_wants_sleep (void)
 /** Returns true if new frame is needed. */
 static bool animation_next_state_with_idle (void)
 {
-	fprintf(stderr, "with idle!!!\n");
 	/* If no one is there (system is idle), neko gets bored and will sleep. */
 	switch (current_neko)
 	{
