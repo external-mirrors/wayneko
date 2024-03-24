@@ -79,7 +79,7 @@ bool recreate_surface_on_close = false;
 enum zwlr_layer_shell_v1_layer layer = ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM;
 
 struct ext_idle_notifier_v1 *idle_notifier = NULL;
-const uint32_t neko_idle_timeout_ms = 180000; /* 3 minutes. */ // TODO make configurable
+uint32_t neko_idle_timeout_ms = 180000; /* 3 minutes. */
 
 struct Seat
 {
@@ -1413,6 +1413,18 @@ int main (int argc, char *argv[])
 				layer = ZWLR_LAYER_SHELL_V1_LAYER_TOP;
 			else if ( strcmp(a, "overlay") == 0 )
 				layer = ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY;
+		}
+		else if ( strcmp(argv[i], "--idle-sleep") == 0 )
+		{
+			const char *a = get_argument(argc, argv, &i);
+			int timeout = atoi(a);
+			if (timeout > 0)
+				neko_idle_timeout_ms = (uint32_t) timeout * 1000;
+			else
+			{
+				fprintf(stderr, "ERROR: Invalid argument '%s' for flag '--idle-sleep'.\n", a);
+				return EXIT_FAILURE;
+			}
 		}
 		else
 		{

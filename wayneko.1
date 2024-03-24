@@ -1,4 +1,4 @@
-.TH WAYNEKO 1 2023-08-14 "git.sr.ht/~leon_plickat/wayneko" "General Commands Manual"
+.TH WAYNEKO 1 2024-03-24 "git.sr.ht/~leon_plickat/wayneko" "General Commands Manual"
 .
 .SH NAME
 .P
@@ -16,6 +16,7 @@ wayneko \- Neko on Wayland
 .OP \-\-background\-colour 0xRRGGBB[AA]
 .OP \-\-outline\-colour 0xRRGGBB[AA]
 .OP \-\-type neko|inu|random
+.OP \-\-idle-sleep seconds
 .OP \-\-layer background|bottom|top|overlay
 .OP \-\-follow\-pointer true|false
 .OP \-\-survive\-close
@@ -57,6 +58,13 @@ Alpha value is optional.
 \fB\-\-type\fR \fBneko\fR|\fBinu\fR|\fBrandom\fR
 .RS
 This option lets you choose between neko and her friend inu.
+.RE
+.
+.P
+\fB\-\-idle-sleep\fR \fIseconds\fR
+.RS
+Set the time in seconds after which neko will go to sleep when the user is
+idle.
 .RE
 .
 .P
