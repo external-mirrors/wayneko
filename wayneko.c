@@ -81,6 +81,9 @@ enum zwlr_layer_shell_v1_layer layer = ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM;
 struct ext_idle_notifier_v1 *idle_notifier = NULL;
 uint32_t neko_idle_timeout_ms = 180000; /* 3 minutes. */
 
+int sleepiness = 4;
+int sleepiness_night = 5;
+
 struct Seat
 {
 	struct wl_list link;
@@ -919,7 +922,7 @@ static bool animation_next_state_normal (void)
          * If the neko is already awake, slightly higher chance to stay awake.
 	 */
 	const bool neko_is_sleeping = current_neko == NEKO_SLEEP_1 || current_neko == NEKO_SLEEP_2;
-	if ( animtation_neko_wants_sleep() && (( neko_is_sleeping && rand() % 5 != 0 ) || ( !neko_is_sleeping && rand() % 2 != 0 )) )
+	if ( animtation_neko_wants_sleep() && (( neko_is_sleeping && rand() % sleepiness_night != 0 ) || ( !neko_is_sleeping && rand() % 2 != 0 )) )
 	{
 		switch (current_neko)
 		{
@@ -1008,7 +1011,7 @@ static bool animation_next_state_normal (void)
 
 		case NEKO_SLEEP_1:
 		case NEKO_SLEEP_2:
-			if ( rand() % 4 == 0 )
+			if ( rand() % sleepiness == 0 )
 			{
 				if ( rand() % 2 == 0 )
 					animation_neko_do_shock();
@@ -1426,6 +1429,30 @@ int main (int argc, char *argv[])
 			else
 			{
 				fprintf(stderr, "ERROR: Invalid argument '%s' for flag '--idle-sleep'.\n", a);
+				return EXIT_FAILURE;
+			}
+		}
+		else if ( strcmp(argv[i], "--sleepiness") == 0 )
+		{
+			const char *a = get_argument(argc, argv, &i);
+			int i = atoi(a);
+			if (i != 0)
+				sleepiness = abs(i) + 1;
+			else
+			{
+				fprintf(stderr, "ERROR: Invalid argument '%s' for flag '--sleepiness'.\n", a);
+				return EXIT_FAILURE;
+			}
+		}
+		else if ( strcmp(argv[i], "--sleepiness-night") == 0 )
+		{
+			const char *a = get_argument(argc, argv, &i);
+			int i = atoi(a);
+			if (i != 0)
+				sleepiness_night = abs(i) + 1;
+			else
+			{
+				fprintf(stderr, "ERROR: Invalid argument '%s' for flag '--sleepiness-night'.\n", a);
 				return EXIT_FAILURE;
 			}
 		}

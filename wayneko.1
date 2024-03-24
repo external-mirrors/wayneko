@@ -17,6 +17,8 @@ wayneko \- Neko on Wayland
 .OP \-\-outline\-colour 0xRRGGBB[AA]
 .OP \-\-type neko|inu|random
 .OP \-\-idle-sleep seconds
+.OP \-\-sleepiness num
+.OP \-\-sleepiness-night num
 .OP \-\-layer background|bottom|top|overlay
 .OP \-\-follow\-pointer true|false
 .OP \-\-survive\-close
@@ -65,6 +67,21 @@ This option lets you choose between neko and her friend inu.
 .RS
 Set the time in seconds after which neko will go to sleep when the user is
 idle.
+.RE
+.
+.P
+\fB\-\-sleepiness\fR \fInum\fR
+.RS
+Set neko's sleepiness as an integer (greater than 0). Higher values make neko
+more sleepy. Defaults to 4.
+.RE
+.
+.P
+\fB\-\-sleepiness-night\fR \fInum\fR
+.RS
+Set neko's sleepiness at night as an integer (greater than 0). Higher values
+make neko more sleepy. This setting acts as an additional sleepiness on top of
+the normal sleepiness. Defaults to 5.
 .RE
 .
 .P
