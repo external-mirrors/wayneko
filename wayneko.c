@@ -936,7 +936,10 @@ static bool animation_next_state_normal (void)
 				return true;
 
 			default:
-				animation_neko_do_yawn();
+				if (rand() % 3 == 0)
+					animation_neko_do_yawn();
+				else
+					animation_neko_do_stare(false);
 				return true;
 		}
 	}
