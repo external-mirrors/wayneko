@@ -1,0 +1,23 @@
+function __wayneko_completion ()
+{
+    case "${COMP_WORDS[-2]}" in
+	"--background-colour"|"--outline-colour"|"--idle-sleep"|"--sleepiness"|"--sleepiness-night")
+	    return
+	    ;;
+	"--layer")
+	    OPTS="background bottom top overlay"
+	    ;;
+	"--follow-pointer")
+	    OPTS="true false"
+	    ;;
+	"--type")
+	    OPTS="neko inu random"
+	    ;;
+	*)
+	    OPTS="-h -? --help --background-colour --outline-colour --type --idle-sleep --sleepiness --sleepiness-night --layer --follow-pointer --survive-close"
+	    ;;
+    esac
+    COMPREPLY=($(compgen -W "${OPTS}" -- "${COMP_WORDS[${COMP_CWORD}]}"))
+}
+
+complete -F __wayneko_completion wayneko

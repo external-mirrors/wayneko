@@ -3,6 +3,7 @@ SCANNER := wayland-scanner
 PREFIX=/usr/local
 BINDIR=$(PREFIX)/bin
 MANDIR=$(PREFIX)/share/man
+BASHCOMPDIR=$(PREFIX)/share/bash-completion/completions
 
 CFLAGS=-Wall -Werror -Wextra -Wpedantic -Wno-unused-parameter -Wconversion $\
 	-Wformat-security -Wformat -Wsign-conversion -Wfloat-conversion $\
@@ -27,13 +28,14 @@ $(OBJ): $(GEN)
 install: wayneko
 	install        -D wayneko   $(DESTDIR)$(BINDIR)/wayneko
 	install -m 644 -D wayneko.1 $(DESTDIR)$(MANDIR)/man1/wayneko.1
+	install        bash-completion $(DESTDIR)$(BASHCOMPDIR)/wayneko
 
 uninstall:
 	$(RM) $(DESTDIR)$(BINDIR)/wayneko
 	$(RM) $(DESTDIR)$(MANDIR)/man1/wayneko.1
+	$(RM) $(DESTDIR)$(BASHCOMPDIR)/wayneko
 
 clean:
 	$(RM) wayneko $(GEN) $(OBJ)
 
 .PHONY: clean install
-
