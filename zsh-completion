@@ -1,0 +1,17 @@
+#compdef wayneko
+
+types=('neko' 'inu' 'random')
+layers=('background' 'bottom' 'top' 'overlay')
+bools=('true' 'false')
+
+_arguments '--help[Print help]' \
+           '--outline-colour:0xRRGGBB[AA]' \
+           '--background-colour:0xRRGGBB[AA]' \
+           '--type[Animal type]:type:{_describe "type" types}' \
+           '--idle-sleep:integer' \
+           '--sleepiness:integer' \
+           '--sleepiness-night:integer' \
+           '--layer[Layer for the surface]:layer:{_describe "layer" layers}' \
+           '--follow-pointer[Follows pointer]:bool:{_describe "bool" bools}' \
+           '--survive-close[Can migrate outputs if closed]' \
+           && return 0
