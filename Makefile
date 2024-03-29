@@ -28,7 +28,7 @@ $(OBJ): $(GEN)
 install: wayneko
 	install        -D wayneko   $(DESTDIR)$(BINDIR)/wayneko
 	install -m 644 -D wayneko.1 $(DESTDIR)$(MANDIR)/man1/wayneko.1
-	install        bash-completion $(DESTDIR)$(BASHCOMPDIR)/wayneko
+	install        -D bash-completion $(DESTDIR)$(BASHCOMPDIR)/wayneko
 
 uninstall:
 	$(RM) $(DESTDIR)$(BINDIR)/wayneko
