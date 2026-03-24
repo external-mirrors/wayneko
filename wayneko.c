@@ -817,7 +817,7 @@ static void animation_neko_do_scratch (void)
 static bool animtation_neko_wants_sleep (void)
 {
 	/* Neko likes to sleep at night. */
-	const long now = time(NULL);
+	const time_t now = time(NULL);
 	struct tm tm = *localtime(&now);
 	return tm.tm_hour >= 23 || tm.tm_hour <= 6;
 }
@@ -1512,8 +1512,8 @@ int main (int argc, char *argv[])
 
 		if (surface.configured)
 		{
-			const uint32_t nsec_delay = animation_timeout * 1000000;
-			const uint32_t epsilon = 1000000;
+			const long nsec_delay = animation_timeout * 1000000;
+			const long epsilon = 1000000;
 			struct timespec time_since_last_tick;
 			timespec_diff(&now, &last_tick, &time_since_last_tick);
 			if ( time_since_last_tick.tv_sec > 0 || time_since_last_tick.tv_nsec >= nsec_delay - epsilon )
