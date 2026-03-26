@@ -151,8 +151,20 @@ const int surface_amount = 1;
 
 struct wl_list buffer_pool;
 
-/* No-Op function plugged into Wayland listeners we don't care about. */
-static void noop () {}
+/* No-Op stubs for Wayland listener callbacks we don't care about. */
+static void noop_pointer_axis_discrete(void *data, struct wl_pointer *p,
+		uint32_t axis, int32_t discrete) { (void)data; (void)p; (void)axis; (void)discrete; }
+static void noop_pointer_axis(void *data, struct wl_pointer *p,
+		uint32_t time, uint32_t axis, wl_fixed_t value) { (void)data; (void)p; (void)time; (void)axis; (void)value; }
+static void noop_pointer_axis_source(void *data, struct wl_pointer *p,
+		uint32_t axis_source) { (void)data; (void)p; (void)axis_source; }
+static void noop_pointer_axis_stop(void *data, struct wl_pointer *p,
+		uint32_t time, uint32_t axis) { (void)data; (void)p; (void)time; (void)axis; }
+static void noop_pointer_button(void *data, struct wl_pointer *p,
+		uint32_t serial, uint32_t time, uint32_t button, uint32_t state) { (void)data; (void)p; (void)serial; (void)time; (void)button; (void)state; }
+static void noop_pointer_frame(void *data, struct wl_pointer *p) { (void)data; (void)p; }
+static void noop_seat_name(void *data, struct wl_seat *seat,
+		const char *name) { (void)data; (void)seat; (void)name; }
 
 /*************
  *           *
@@ -553,12 +565,12 @@ static const struct wl_pointer_listener pointer_listener = {
 	.enter         = pointer_handle_enter,
 	.leave         = pointer_handle_leave,
 	.motion        = pointer_handle_motion,
-	.axis_discrete = noop,
-	.axis          = noop,
-	.axis_source   = noop,
-	.axis_stop     = noop,
-	.button        = noop,
-	.frame         = noop,
+	.axis_discrete = noop_pointer_axis_discrete,
+	.axis          = noop_pointer_axis,
+	.axis_source   = noop_pointer_axis_source,
+	.axis_stop     = noop_pointer_axis_stop,
+	.button        = noop_pointer_button,
+	.frame         = noop_pointer_frame,
 };
 
 static void seat_bind_pointer (struct Seat *seat)
@@ -580,7 +592,7 @@ static void seat_handle_capabilities (void *data, struct wl_seat *wl_seat,
 
 static const struct wl_seat_listener seat_listener = {
 	.capabilities = seat_handle_capabilities,
-	.name = noop,
+	.name = noop_seat_name,
 };
 
 static void ext_idle_notification_handle_idled (void *data,
